@@ -45,6 +45,8 @@ class Shape(object):
         self.selected = False
         self.difficult = difficult
         self.paint_label = paint_label
+        self.moveall=False #edit sjs
+        self.lockvertex=False #edit sjs
 
         self._highlight_index = None
         self._highlight_mode = self.NEAR_VERTEX
@@ -153,13 +155,10 @@ class Shape(object):
             assert False, "unsupported vertex shape"
 
     def nearest_vertex(self, point, epsilon):
-        index = None
         for i, p in enumerate(self.points):
-            dist = distance(p - point)
-            if dist <= epsilon:
-                index = i
-                epsilon = dist
-        return index
+            if distance(p - point) <= epsilon:
+                return i
+        return None
 
     def contains_point(self, point):
         return self.make_path().contains(point)
@@ -177,7 +176,8 @@ class Shape(object):
         self.points = [p + offset for p in self.points]
 
     def move_vertex_by(self, i, offset):
-        self.points[i] = self.points[i] + offset
+        if self.lockvertex==False:
+            self.points[i] = self.points[i] + offset
 
     def highlight_vertex(self, i, action):
         self._highlight_index = i

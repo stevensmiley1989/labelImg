@@ -32,7 +32,6 @@ class CreateMLWriter:
 
         output_image_dict = {
             "image": self.filename,
-            "verified": self.verified,
             "annotations": []
         }
 
@@ -108,15 +107,12 @@ class CreateMLReader:
         with open(self.json_path, "r") as file:
             input_data = file.read()
 
-        # Returns a list
-        output_list = json.loads(input_data)
-
-        if output_list:
-            self.verified = output_list[0].get("verified", False)
+        output_dict = json.loads(input_data)
+        self.verified = True
 
         if len(self.shapes) > 0:
             self.shapes = []
-        for image in output_list:
+        for image in output_dict:
             if image["image"] == self.filename:
                 for shape in image["annotations"]:
                     self.add_shape(shape["label"], shape["coordinates"])

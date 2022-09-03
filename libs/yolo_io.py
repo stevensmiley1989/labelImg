@@ -19,10 +19,12 @@ class YOLOWriter:
         self.local_img_path = local_img_path
         self.verified = False
 
-    def add_bnd_box(self, x_min, y_min, x_max, y_max, name, difficult):
+    def add_bnd_box(self, x_min, y_min, x_max, y_max, name, difficult,confidence,track_id): #edit sjs
         bnd_box = {'xmin': x_min, 'ymin': y_min, 'xmax': x_max, 'ymax': y_max}
         bnd_box['name'] = name
         bnd_box['difficult'] = difficult
+        bnd_box['confidence']=confidence
+        bnd_box['track_id']=track_id
         self.box_list.append(bnd_box)
 
     def bnd_box_to_yolo_line(self, box, class_list=[]):
@@ -113,10 +115,10 @@ class YoloReader:
     def get_shapes(self):
         return self.shapes
 
-    def add_shape(self, label, x_min, y_min, x_max, y_max, difficult):
+    def add_shape(self, label, x_min, y_min, x_max, y_max, difficult,confidence,track_id): #edit sjs
 
         points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-        self.shapes.append((label, points, None, None, difficult))
+        self.shapes.append((label, points, None, None, difficult,confidence,track_id))
 
     def yolo_line_to_shape(self, class_index, x_center, y_center, w, h):
         label = self.classes[int(class_index)]
@@ -140,4 +142,4 @@ class YoloReader:
             label, x_min, y_min, x_max, y_max = self.yolo_line_to_shape(class_index, x_center, y_center, w, h)
 
             # Caveat: difficult flag is discarded when saved as yolo format.
-            self.add_shape(label, x_min, y_min, x_max, y_max, False)
+            self.add_shape(label, x_min, y_min, x_max, y_max, False,"","") #edit sjs

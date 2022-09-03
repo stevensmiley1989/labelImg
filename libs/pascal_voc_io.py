@@ -77,10 +77,12 @@ class PascalVocWriter:
         segmented.text = '0'
         return top
 
-    def add_bnd_box(self, x_min, y_min, x_max, y_max, name, difficult):
+    def add_bnd_box(self, x_min, y_min, x_max, y_max, name, difficult,confidence,track_id):#edit sjs
         bnd_box = {'xmin': x_min, 'ymin': y_min, 'xmax': x_max, 'ymax': y_max}
         bnd_box['name'] = name
         bnd_box['difficult'] = difficult
+        bnd_box['confidence'] = confidence #edit sjs
+        bnd_box['track_id']=track_id #edit sjs
         self.box_list.append(bnd_box)
 
     def append_objects(self, top):
@@ -99,6 +101,10 @@ class PascalVocWriter:
                 truncated.text = "0"
             difficult = SubElement(object_item, 'difficult')
             difficult.text = str(bool(each_object['difficult']) & 1)
+            confidence = SubElement(object_item, 'confidence') #edit sjs
+            confidence.text = str(each_object['confidence']) #edit sjs
+            track_id = SubElement(object_item, 'track_id') #edit sjs
+            track_id.text = str(each_object['track_id']) #edit sjs
             bnd_box = SubElement(object_item, 'bndbox')
             x_min = SubElement(bnd_box, 'xmin')
             x_min.text = str(each_object['xmin'])
@@ -140,13 +146,13 @@ class PascalVocReader:
     def get_shapes(self):
         return self.shapes
 
-    def add_shape(self, label, bnd_box, difficult):
+    def add_shape(self, label, bnd_box, difficult,confidence,track_id):
         x_min = int(float(bnd_box.find('xmin').text))
         y_min = int(float(bnd_box.find('ymin').text))
         x_max = int(float(bnd_box.find('xmax').text))
         y_max = int(float(bnd_box.find('ymax').text))
         points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-        self.shapes.append((label, points, None, None, difficult))
+        self.shapes.append((label, points, None, None, difficult,confidence,track_id))
 
     def parse_xml(self):
         assert self.file_path.endswith(XML_EXT), "Unsupported file format"
@@ -167,5 +173,24 @@ class PascalVocReader:
             difficult = False
             if object_iter.find('difficult') is not None:
                 difficult = bool(int(object_iter.find('difficult').text))
-            self.add_shape(label, bnd_box, difficult)
+            # Add sjs
+            confidence=""
+            if object_iter.find('confidence') is not None:
+                try:
+                    confidence=object_iter.find('confidence').text
+                    #print(confidence.isnumeric())
+                    if confidence.replace('.','').isnumeric()==False:
+                            confidence=""
+                except:
+                    confidence=""
+                
+            track_id=""
+            if object_iter.find('track_id') is not None:
+                try:
+                    track_id=object_iter.find('track_id').text
+                    if track_id.isnumeric()==False:
+                        track_id=""
+                except:
+                    track_id=""
+            self.add_shape(label, bnd_box, difficult,confidence,track_id) #edit sjs
         return True

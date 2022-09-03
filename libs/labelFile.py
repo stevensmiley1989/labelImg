@@ -74,8 +74,11 @@ class LabelFile(object):
             label = shape['label']
             # Add Chris
             difficult = int(shape['difficult'])
+            # Add sjs
+            confidence = shape['confidence']
+            track_id=shape['track_id']
             bnd_box = LabelFile.convert_points_to_bnd_box(points)
-            writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult)
+            writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult,confidence,track_id)
 
         writer.save(target_file=filename)
         return
@@ -104,8 +107,11 @@ class LabelFile(object):
             label = shape['label']
             # Add Chris
             difficult = int(shape['difficult'])
+            # Add sjs
+            confidence = shape['confidence']
+            track_id=shape['track_id']
             bnd_box = LabelFile.convert_points_to_bnd_box(points)
-            writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult)
+            writer.add_bnd_box(bnd_box[0], bnd_box[1], bnd_box[2], bnd_box[3], label, difficult,confidence,track_id) #edit sjs
 
         writer.save(target_file=filename, class_list=class_list)
         return

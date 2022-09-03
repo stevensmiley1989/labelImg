@@ -11,7 +11,7 @@ except ImportError:
 
 from libs.utils import distance
 import sys
-
+import numpy as np #edit sjs
 DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
 DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
 DEFAULT_SELECT_LINE_COLOR = QColor(255, 255, 255)
@@ -36,10 +36,12 @@ class Shape(object):
     point_type = P_ROUND
     point_size = 16
     scale = 1.0
-    label_font_size = 8
+    label_font_size = 8#edit sjs from 8
 
-    def __init__(self, label=None, line_color=None, difficult=False, paint_label=False):
+    def __init__(self, label=None, line_color=None, difficult=False, paint_label=False,confidence="",track_id=""): #edit sjs
         self.label = label
+        self.confidence=confidence #edit sjs
+        self.track_id=track_id #edit sjs
         self.points = []
         self.fill = False
         self.selected = False
@@ -128,9 +130,21 @@ class Shape(object):
                     painter.setFont(font)
                     if self.label is None:
                         self.label = ""
+                    #edit sjs confidence
+                    if self.confidence=="" or self.confidence.replace('.','').isnumeric()==False:
+                        self.confidence = ""
+                        put_conf=""
+                    else:
+                        put_conf="  {}".format(str(np.round(float(self.confidence),2)))
+
+                    if self.track_id=="" or self.track_id.isnumeric()==False:
+                        put_track=""
+                        self.track_id = ""
+                    else:
+                        put_track="ID:{} ".format(self.track_id)
                     if min_y < min_y_label:
                         min_y += min_y_label
-                    painter.drawText(int(min_x), int(min_y), self.label)
+                    painter.drawText(int(min_x), int(min_y), put_track+self.label+put_conf)
 
             if self.fill:
                 color = self.select_fill_color if self.selected else self.fill_color

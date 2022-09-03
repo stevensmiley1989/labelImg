@@ -47,8 +47,9 @@ from libs.create_ml_io import JSON_EXT
 from libs.ustr import ustr
 from libs.hashableQListWidgetItem import HashableQListWidgetItem
 
+#edit sjs
+import cv2
 __appname__ = 'labelImg'
-
 
 class WindowMixin(object):
 
@@ -154,12 +155,20 @@ class MainWindow(QMainWindow, WindowMixin):
         self.lockvertex_button.stateChanged.connect(self.button_state_lockvertex) #edit SJS
         self.lockvertex_button.setShortcut('L')
 
+        # Create a widget for unselecting draw, edit SJS
+        self.edit_mode_button = QCheckBox('editBox [B]')
+        self.edit_mode_button.setChecked(False)
+        self.edit_mode_button.stateChanged.connect(self.set_edit_mode)
+        self.edit_mode_button.setShortcut('B')
+
+
         # Add some of widgets to list_layout
         list_layout.addWidget(self.edit_button)
         list_layout.addWidget(self.diffc_button)
         list_layout.addWidget(use_default_label_container)
         list_layout.addWidget(self.moveall_button) #edit SJS
         list_layout.addWidget(self.lockvertex_button) #edit SJS
+        list_layout.addWidget(self.edit_mode_button) #edit SJS
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -876,7 +885,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def load_labels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult in shapes:
+        for label, points, line_color, fill_color, difficult,confidence,track_id in shapes:
             shape = Shape(label=label)
             for x, y in points:
 
@@ -887,6 +896,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
                 shape.add_point(QPointF(x, y))
             shape.difficult = difficult
+            shape.confidence=confidence #edit sjs
+            shape.track_id=track_id #edit sjs
             shape.close()
             s.append(shape)
 
@@ -927,7 +938,11 @@ class MainWindow(QMainWindow, WindowMixin):
                         fill_color=s.fill_color.getRgb(),
                         points=[(p.x(), p.y()) for p in s.points],
                         # add chris
-                        difficult=s.difficult)
+                        difficult=s.difficult,
+                        # add sjs
+                        confidence=s.confidence,
+                        # add sjs
+                        track_id=s.track_id)
 
         shapes = [format_shape(shape) for shape in self.canvas.shapes]
         # Can add different annotation formats here
@@ -1241,7 +1256,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def paint_canvas(self):
         assert not self.image.isNull(), "cannot paint null image"
         self.canvas.scale = 0.01 * self.zoom_widget.value()
-        self.canvas.label_font_size = int(0.02 * max(self.image.width(), self.image.height()))
+        self.canvas.label_font_size = int(0.01 * max(self.image.width(), self.image.height())) #edit sjs 0.02 OG
         self.canvas.adjustSize()
         self.canvas.update()
 

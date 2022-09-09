@@ -38,7 +38,7 @@ class Shape(object):
     scale = 1.0
     label_font_size = 8#edit sjs from 8
 
-    def __init__(self, label=None, line_color=None, difficult=False, paint_label=False,confidence="",track_id=""): #edit sjs
+    def __init__(self, label=None, line_color=None, difficult=False, paint_label=False,confidence="0",track_id="0"): #edit sjs
         self.label = label
         self.confidence=confidence #edit sjs
         self.track_id=track_id #edit sjs
@@ -132,14 +132,14 @@ class Shape(object):
                         self.label = ""
                     #edit sjs confidence
                     if self.confidence=="" or self.confidence.replace('.','').isnumeric()==False:
-                        self.confidence = ""
-                        put_conf=""
+                        self.confidence = "0"
+                        put_conf="  {}".format(str(np.round(float(self.confidence),2)))
                     else:
                         put_conf="  {}".format(str(np.round(float(self.confidence),2)))
 
                     if self.track_id=="" or self.track_id.isnumeric()==False:
-                        put_track=""
-                        self.track_id = ""
+                        self.track_id = "0"
+                        put_track="ID:{} ".format(self.track_id)
                     else:
                         put_track="ID:{} ".format(self.track_id)
                     if min_y < min_y_label:

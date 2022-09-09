@@ -174,23 +174,23 @@ class PascalVocReader:
             if object_iter.find('difficult') is not None:
                 difficult = bool(int(object_iter.find('difficult').text))
             # Add sjs
-            confidence=""
+            confidence="0"
             if object_iter.find('confidence') is not None:
                 try:
                     confidence=object_iter.find('confidence').text
                     #print(confidence.isnumeric())
                     if confidence.replace('.','').isnumeric()==False:
-                            confidence=""
+                            confidence="0"
                 except:
-                    confidence=""
+                    confidence="0"
                 
-            track_id=""
+            track_id="0"
             if object_iter.find('track_id') is not None:
                 try:
                     track_id=object_iter.find('track_id').text
                     if track_id.isnumeric()==False:
-                        track_id=""
+                        track_id="0"
                 except:
-                    track_id=""
+                    track_id="0"
             self.add_shape(label, bnd_box, difficult,confidence,track_id) #edit sjs
         return True

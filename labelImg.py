@@ -142,6 +142,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.diffc_button.stateChanged.connect(self.button_state)
         self.edit_button = QToolButton()
         self.edit_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        
 
         # Create a widget for moving bboxes, edit SJS
         self.moveall_button = QCheckBox('MoveAll_BBOXES [M]') #edit SJS
@@ -161,6 +162,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.edit_mode_button.stateChanged.connect(self.set_edit_mode)
         self.edit_mode_button.setShortcut('B')
 
+        # Create a widget to keep diffc button #edit sjs
+        self.diffc_button_keep=QCheckBox('keep difficult [H]')
+        self.diffc_button_keep.setChecked(False)
+        self.diffc_button_keep.stateChanged.connect(self.button_state_keep)
+        self.diffc_button_keep.setShortcut('H') #H for hard
 
         # Add some of widgets to list_layout
         list_layout.addWidget(self.edit_button)
@@ -169,6 +175,7 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout.addWidget(self.moveall_button) #edit SJS
         list_layout.addWidget(self.lockvertex_button) #edit SJS
         list_layout.addWidget(self.edit_mode_button) #edit SJS
+        list_layout.addWidget(self.diffc_button_keep) #edit SJS
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -788,7 +795,40 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
         except:
             pass
+    # Add steven
+    def button_state_keep(self, item=None):
+        """ Function to handle difficult examples
+        Update on each object """
+        if not self.canvas.editing():
+            return
 
+        item = self.current_item()
+        if not item:  # If not selected Item, take the first one
+            item = self.label_list.item(self.label_list.count() - 1)
+        
+
+        #difficult = self.diffc_button.isChecked()
+        difficult = self.diffc_button_keep.isChecked()
+        if difficult:
+            self.diffc_button.setChecked(True)
+        else:
+            self.diffc_button.setChecked(False)
+        for i in range(self.label_list.count()):
+            item=self.label_list.item(i)
+
+            try:
+                shape = self.items_to_shapes[item]
+            except:
+                pass
+            # Checked and Update
+            try:
+                if difficult != shape.difficult:
+                    shape.difficult = difficult
+                    self.set_dirty()
+                else:  # User probably changed item visibility
+                    self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
+            except:
+                pass
     # edit SJS
     def button_state_moveall(self, item=None): #edit sjs
         """ Function to handle copying previous button selections
@@ -1473,6 +1513,9 @@ class MainWindow(QMainWindow, WindowMixin):
 
         if filename:
             self.load_file(filename)
+
+        if self.diffc_button_keep.isChecked():
+            self.diffc_button.setChecked(True)
 
     def open_file(self, _value=False):
         if not self.may_continue():

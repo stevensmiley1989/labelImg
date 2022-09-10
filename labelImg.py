@@ -177,6 +177,12 @@ class MainWindow(QMainWindow, WindowMixin):
         self.diffc_button_keep.stateChanged.connect(self.button_state_keep)
         self.diffc_button_keep.setShortcut('H') #H for hard
 
+        # Create a widget to keep diffc button #edit sjs
+        self.undiffc_button_keep=QCheckBox('unkeep difficult [U]')
+        self.undiffc_button_keep.setChecked(False)
+        self.undiffc_button_keep.stateChanged.connect(self.button_state_unkeep)
+        self.undiffc_button_keep.setShortcut('U') #H for hard
+
         # Create a widget to keep yolov7 button #edit sjs
         self.yolov7_button=QCheckBox('use YoloV7 [Y]')
         self.yolov7_button.setChecked(False)
@@ -193,7 +199,8 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout.addWidget(self.lockvertex_button) #edit SJS
         list_layout.addWidget(self.edit_mode_button) #edit SJS
         list_layout.addWidget(self.diffc_button_keep) #edit SJS
-        list_layout.addWidget(self.yolov7_button)
+        list_layout.addWidget(self.undiffc_button_keep) #edit SJS
+        list_layout.addWidget(self.yolov7_button) #edit SJS
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -829,6 +836,7 @@ class MainWindow(QMainWindow, WindowMixin):
         difficult = self.diffc_button_keep.isChecked()
         if difficult:
             self.diffc_button.setChecked(True)
+            self.undiffc_button_keep.setChecked(False)
         else:
             self.diffc_button.setChecked(False)
         for i in range(self.label_list.count()):
@@ -847,6 +855,43 @@ class MainWindow(QMainWindow, WindowMixin):
                     self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
             except:
                 pass
+    # Add steven
+    def button_state_unkeep(self, item=None):
+        """ Function to handle difficult examples
+        Update on each object """
+        if not self.canvas.editing():
+            return
+
+        item = self.current_item()
+        if not item:  # If not selected Item, take the first one
+            item = self.label_list.item(self.label_list.count() - 1)
+        
+
+        #difficult = self.diffc_button.isChecked()
+        
+        undifficult = self.undiffc_button_keep.isChecked()
+        if undifficult:
+            self.diffc_button.setChecked(False)
+            self.diffc_button_keep.setChecked(False)
+
+        for i in range(self.label_list.count()):
+            item=self.label_list.item(i)
+
+            try:
+                shape = self.items_to_shapes[item]
+            except:
+                pass
+                pass
+            # Checked and Update
+            try:
+                if not(undifficult) != shape.difficult:
+                    shape.difficult = not(undifficult)
+                    self.set_dirty()
+                else:  # User probably changed item visibility
+                    self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
+            except:
+                pass
+
     # edit SJS
     def button_state_moveall(self, item=None): #edit sjs
         """ Function to handle copying previous button selections
@@ -1251,11 +1296,26 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.error_message(u'Error opening file',
                                    u"<p>Make sure <i>%s</i> is a valid image file." % unicode_file_path)
                 self.status("Error reading %s" % unicode_file_path)
+                bad_anno=self.get_annotation_file_from_image(unicode_file_path)
+                print('This is the bad_annotation file',bad_anno)
+                if os.path.exists('bad_images')==False:
+                    os.makedirs('bad_images')
+                if os.path.exists(os.path.join('bad_images',os.path.basename(unicode_file_path))):
+                    os.remove(os.path.join('bad_images',os.path.basename(unicode_file_path)))
+                shutil.move(unicode_file_path,'bad_images')
+                if os.path.exists(os.path.join('bad_images',os.path.basename(bad_anno))):
+                    os.remove(os.path.join('bad_images',os.path.basename(bad_anno)))
+                shutil.move(bad_anno,'bad_images')
+                self.import_dir_images(self.last_open_dir)
+
+                print(f'moved {unicode_file_path} to bad_images')
+                print(f'moved {bad_anno} to bad_images')
                 return False
             self.status("Loaded %s" % os.path.basename(unicode_file_path))
             self.image = image
             self.file_path = unicode_file_path
             self.canvas.load_pixmap(QPixmap.fromImage(image))
+
             if self.label_file:
                 self.load_labels(self.label_file.shapes)
             self.set_clean()
@@ -1308,6 +1368,30 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.load_pascal_xml_by_filename(xml_path)
             elif os.path.isfile(txt_path):
                 self.load_yolo_txt_by_filename(txt_path)
+
+    def get_annotation_file_from_image(self, file_path):
+        if self.default_save_dir is not None:
+            basename = os.path.basename(os.path.splitext(file_path)[0])
+            xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
+            txt_path = os.path.join(self.default_save_dir, basename + TXT_EXT)
+            json_path = os.path.join(self.default_save_dir, basename + JSON_EXT)
+
+            """Annotation file priority:
+            PascalXML > YOLO
+            """
+            if os.path.isfile(xml_path):
+                return xml_path
+            elif os.path.isfile(txt_path):
+                return txt_path
+
+        else:
+            xml_path = os.path.splitext(file_path)[0] + XML_EXT
+            txt_path = os.path.splitext(file_path)[0] + TXT_EXT
+            if os.path.isfile(xml_path):
+                return xml_path
+            elif os.path.isfile(txt_path):
+                return txt_path
+
 
     def resizeEvent(self, event):
         if self.canvas and not self.image.isNull()\
@@ -1624,8 +1708,10 @@ class MainWindow(QMainWindow, WindowMixin):
                     print('not connected to Yolov7 yet')
 
 
-        if self.diffc_button_keep.isChecked():
+        if self.diffc_button_keep.isChecked() and not(self.undiffc_button_keep.isChecked()):
             self.diffc_button.setChecked(True)
+        elif self.undiffc_button_keep.isChecked():
+            self.diffc_button.setChecked(False)
         
 
 

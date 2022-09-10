@@ -49,6 +49,15 @@ from libs.hashableQListWidgetItem import HashableQListWidgetItem
 
 #edit sjs
 import cv2
+import shutil
+import socket
+import threading
+from multiprocessing import Queue
+import python_server
+from python_server import convert_boxes
+xy=Queue()
+ready=Queue()
+response=Queue()
 __appname__ = 'labelImg'
 
 class WindowMixin(object):
@@ -168,6 +177,14 @@ class MainWindow(QMainWindow, WindowMixin):
         self.diffc_button_keep.stateChanged.connect(self.button_state_keep)
         self.diffc_button_keep.setShortcut('H') #H for hard
 
+        # Create a widget to keep yolov7 button #edit sjs
+        self.yolov7_button=QCheckBox('use YoloV7 [Y]')
+        self.yolov7_button.setChecked(False)
+        self.yolov7_button.stateChanged.connect(self.button_state_yolov7)
+        self.yolov7_button.setShortcut('Y') #H for hard
+        self.boxes_received=[]
+        self.use_socket=False
+
         # Add some of widgets to list_layout
         list_layout.addWidget(self.edit_button)
         list_layout.addWidget(self.diffc_button)
@@ -176,6 +193,7 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout.addWidget(self.lockvertex_button) #edit SJS
         list_layout.addWidget(self.edit_mode_button) #edit SJS
         list_layout.addWidget(self.diffc_button_keep) #edit SJS
+        list_layout.addWidget(self.yolov7_button)
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -856,6 +874,10 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
         except:
             pass
+    # edit SJS
+    def button_state_yolov7(self, item=None): #edit sjs
+        """ Function to handle incoming yolov7 detections to update on each object """
+        print('called button_state_yolov7')
 
     # edit SJS
     def button_state_lockvertex(self, item=None): #edit sjs
@@ -1510,12 +1532,103 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.cur_img_idx += 1
                 
                 filename = self.m_img_list[self.cur_img_idx]
-
         if filename:
             self.load_file(filename)
+        if self.yolov7_button.isChecked(): #edit sjs
+            if filename:
+                print('Sending image to Yolov7')
+                if os.path.exists('tmp_yolo'):
+                    os.system('rm -rf tmp_yolo')
+                os.makedirs('tmp_yolo')
+                shutil.copy(filename,'tmp_yolo')
+                if  self.use_socket==False:
+
+                    try:
+
+                        PORT_RX=8765
+                        HOST_RX=socket.gethostname()
+                        print('using Socket to receive for PORT_RECEIVE=={} and HOST_RECEIVE=={}'.format(PORT_RX,HOST_RX))
+                        python_server_Thread=threading.Thread(target=python_server.init,args=(xy,ready,response,PORT_RX,)).start()
+                        print('using Socket for PORT=={} and HOST=={}'.format(PORT_RX,HOST_RX))
+                    except:
+                        print('Cannot start python_server')
+                    try:
+                        if ready.empty():
+                            ready.put(True)
+                        self.use_socket=True
+                    except:
+                        print('Not accepting socket')
+                        self.use_socket=False
+                    
+                try:
+                    msg_to_send=os.path.abspath('tmp_yolo')
+                    if response.empty()==False:
+                        response.get()
+                        
+                        response.put(msg_to_send)
+                    else:
+                        response.put(msg_to_send)
+                    if ready.empty()==False:
+                        ready.get()
+                        ready.put(True)
+                    else:
+                        ready.put(True)
+                    while xy.empty():
+                        pass
+                        #myboxes=python_server.get_timed_out(xy,5)
+                        #if myboxes=='timed_out':
+                        #    break
+                        #else:
+                         #   full_boxes_i=myboxes
+                         #   xy.put(full_boxes_i)
+                         #   break
+                        #print(myboxes)
+
+                    #if myboxes!='timed_out':
+                    full_boxes_i=xy.get()
+                    print('full_boxes_i',full_boxes_i)
+                    boxes_received=python_server.convert_boxes(full_boxes_i)
+                    print(f'LABELIMG received: {boxes_received}')
+                    self.boxes_received=boxes_received
+                    if len(self.boxes_received)>0:
+                        shapes=[]
+                        for boundingboxes_i in self.boxes_received:
+                            label=boundingboxes_i['obj_found']
+                            xmin=int(boundingboxes_i['xmin'])
+                            ymin=int(boundingboxes_i['ymin'])
+                            xmax=int(boundingboxes_i['xmax'])
+                            ymax=int(boundingboxes_i['ymax'])
+                            confidence=str(boundingboxes_i['confidence'])
+                            W=boundingboxes_i['W']
+                            H=boundingboxes_i['H']
+                            points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+                            if self.diffc_button.isChecked():
+                                difficult='1'
+                            else:
+                                difficult='0'
+                            track_id='0'
+                            shape=(label, points, None, None, difficult,confidence,track_id)
+                            shapes.append(shape)
+                        self.load_labels(shapes)
+                        self.save_file()
+                        self.canvas.verified = True
+                    self.boxes_received=[]
+
+
+
+
+                    
+
+                except:
+                    print(xy.empty())
+                    print('not connected to Yolov7 yet')
+
 
         if self.diffc_button_keep.isChecked():
             self.diffc_button.setChecked(True)
+        
+
+
 
     def open_file(self, _value=False):
         if not self.may_continue():

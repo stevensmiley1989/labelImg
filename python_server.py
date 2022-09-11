@@ -82,7 +82,10 @@ def convert_boxes(full_boxes_i):
         if len(bbxy_i)>0: 
             print('valid bbxy_i')         
             boundingboxes_i={}
-            obj_found=bbxy_i.split('_')[1].split(';')[0]
+            #obj_found=bbxy_i.split('_')[1].split(';')[0]
+            obj_found=bbxy_i.split(';')[0]
+            lu=obj_found.find('_')+1
+            obj_found=obj_found[lu:]
             obj_found=obj_found.replace("b'",'').replace("'","").replace('"',"")
             bbxy_i=bbxy_i.split(obj_found)[1]
 

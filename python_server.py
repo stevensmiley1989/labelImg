@@ -27,9 +27,22 @@ def threaded_client(conn,xy,response,ready):
                     
             except:
                 pass
-            data=conn.recv(1024)
-            if not data:
-                break;
+            #data=conn.recv(1024)
+            START='STAART'
+            END='EENNDD'
+            data_decode=''
+            END_FOUND=False
+            while END_FOUND==False:
+                data_i=conn.recv(1024)
+                data_decode=data_decode+data_i.decode()
+                if data_decode.find(START)!=-1 and data_decode.find(END)!=-1:
+                    END_FOUND=True
+                    data=data_decode.replace(START,'').replace(END,'')
+                    data=data.encode()
+            
+            #data=conn.recv(3072)
+            #if not data:
+            #    break;
             print(data.decode());
             xy.put(data.decode().strip(' '));
 

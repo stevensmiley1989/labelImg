@@ -58,7 +58,179 @@ from python_server import convert_boxes
 xy=Queue()
 ready=Queue()
 response=Queue()
+import numpy as np
+from PIL import Image
+from scipy import spatial
 __appname__ = 'labelImg'
+import time
+def bb_intersection(boxA,boxB):
+    xA=max(boxA[0],boxB[0])
+    yA=max(boxA[1],boxB[1])
+    xB=min(boxA[2],boxB[2])
+    yB=min(boxA[3],boxB[3])
+    interArea=max(0,xB-xA+1)*max(0,yB-yA+1)
+    boxAArea=(boxA[2]-boxA[0]+1)*(boxA[3]-boxA[1]+1)
+    boxBArea=(boxB[2]-boxB[0]+1)*(boxB[3]-boxB[1]+1)
+    denominator=float(boxAArea+boxBArea-interArea)
+    if denominator>0.001: #small number close to zero
+        iou=interArea/float(boxAArea+boxBArea-interArea)
+    else:
+        iou=1
+    return iou
+class CUSTOM_TRACKER:
+    def __init__(self):
+        self.create_tracker()
+        # initialize the bounding box coordinates of the object we are going
+        # to track
+        self.initBB = None
+        self.labelBB = None
+        self.confBB = 1.0
+        self.custom=False
+        self.initFRAME=None
+        self.score=1.0
+        self.track_id=0
+        self.host_name= socket.gethostname() # send hostname with each image
+        self.classifier_bad=False
+        self.classifier_bad_count=0
+        #self.classifier_bad_count_THRESHOLD=args['classifier_bad_count_THRESHOLD']#4 #number of bad hits to remove
+        #self.df_ICSP=df_ICSP
+        self.classifier_confidence=1.0
+        #self.classifier_confidence_THRESHOLD=args["classifier_confidence_THRESHOLD"]#0.95
+        self.bad_count=0 
+        self.time_checked=time.time()
+        #self.cosine_THRESHOLD=args["cosine_THRESHOLD"]
+
+        #try:
+        #        s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+        #        s.connect(("8.8.8.8",80))
+        #        self.IP_ADDRESS=s.getsockname()[0]
+        #except:
+        #    self.IP_ADDRESS="127.0.0.1"
+        #self.HOST=self.IP_ADDRESS # send hostname with each image
+        self.PORT=5559
+        self.target=None
+        self.similarity=1.0
+        self.count=0
+        self.cosine_THRESHOLD=0.65
+        self.THRESHOLD_H=2.0
+        self.THRESHOLD_W=2.0
+    def create_tracker(self):
+        # extract the OpenCV version info
+        (major, minor) = cv2.__version__.split(".")[:2]
+        # if we are using OpenCV 3.2 OR BEFORE, we can use a special factory
+        # function to create our object tracker
+        if int(major) == 3 and int(minor) < 3:
+            self.tracker = cv2.Tracker_create("CSRT")
+        # otherwise, for OpenCV 3.3 OR NEWER, we need to explicity call the
+        # approrpiate object tracker constructor:
+        else:
+            # initialize a dictionary that maps strings to their corresponding
+            # OpenCV object tracker implementations
+            OPENCV_OBJECT_TRACKERS = {
+                "csrt": cv2.TrackerCSRT_create,
+                "kcf": cv2.TrackerKCF_create,
+                "mil": cv2.TrackerMIL_create,
+            }
+            # grab the appropriate object tracker using our dictionary of
+            # OpenCV object tracker objects
+            self.tracker = OPENCV_OBJECT_TRACKERS["csrt"]()
+            print('NEW TRACKER')
+            self.track_new=True
+    def grab_initOG(self):
+        self.initBB_OG=self.initBB
+        self.initFRAME_OG=self.initFRAME
+
+    def grab_frame(self,frame,box):
+        self.currentFRAME=frame
+        self.currentBOX=box
+            
+    def update_tracks(self):
+        self.initFRAME=self.currentFRAME
+        self.initBB=self.currentBOX
+        self.update_box()
+        if self.track_new:
+            self.tracker.update(self.initFRAME)
+            self.track_new=False
+
+    def update_box(self):
+        xmin_i=max(0,self.initBB[0])
+        xmax_i=min(self.initFRAME.shape[1],self.initBB[0]+self.initBB[2])
+        ymin_i=max(0,self.initBB[1])
+        ymax_i=min(self.initFRAME.shape[0],self.initBB[1]+self.initBB[3])
+        self.box=(xmin_i,ymin_i,xmax_i,ymax_i)
+    def get_bbox_stuff(self):
+        # self.xmin=max(0,self.currentBOX[0])
+        # self.xmax=min(self.currentFRAME.shape[1],self.currentBOX[0]+self.currentBOX[2])
+        # self.ymin=max(0,self.currentBOX[1])
+        # self.ymax=min(self.currentFRAME.shape[0],self.currentBOX[1]+self.currentBOX[3])
+        self.update_box()
+        (self.xmin,self.ymin,self.xmax,self.ymax)=self.box
+        #self.confBB=self.confBB
+        #self.track_id=self.track_id
+        return (self.labelBB,self.xmin,self.ymin,self.xmax,self.ymax,self.confBB,self.track_id,self.score,self.similarity,self.classifier_confidence)
+    def convert_frame_chip(self,jpg_i,bbox_i):
+        #print(bbox_i)
+        xmin_i=max(0,bbox_i[0])
+        xmax_i=min(jpg_i.shape[1],bbox_i[0]+bbox_i[2])
+        ymin_i=max(0,bbox_i[1])
+        ymax_i=min(jpg_i.shape[0],bbox_i[1]+bbox_i[3])
+        #longest=max(ymax_i-ymin_i,xmax_i-xmin_i)
+
+        chip_i=jpg_i[ymin_i:ymax_i,xmin_i:xmax_i,:]
+        chip_square_i=Image.fromarray(chip_i)
+        self.W=self.initBB[2]
+        self.H=self.initBB[3]
+        chip_square_i=chip_square_i.resize((self.W,self.H),Image.ANTIALIAS)
+        chip_square_i=np.array(chip_square_i)
+        return chip_square_i
+    def check_size(self):
+        self.W_OG=self.initBB_OG[2]-self.initBB_OG[0]
+        self.H_OG=self.initBB_OG[3]-self.initBB_OG[1]
+        self.W=self.initBB[2]-self.initBB[0]
+        self.H=self.initBB[3]-self.initBB[1]
+        self.min_W=float(min(self.W_OG,self.W))
+        self.min_H=float(min(self.H_OG,self.H))
+        self.max_W=float(max(self.W_OG,self.W))
+        self.max_H=float(max(self.H_OG,self.H))
+        if float(self.max_H/self.min_H)>self.THRESHOLD_H:
+            print('max_H/min_H = ',self.max_H/self.min_H)
+            print(f'REMOVING due to THRESHOLD = {self.THRESHOLD_H}')
+            self.score=0
+        if float(self.max_W/self.min_W)>self.THRESHOLD_W:
+            print('max_W/min_W = ',self.max_W/self.min_W)
+            print(f'REMOVING due to THRESHOLD = {self.THRESHOLD_W}')
+            self.score=0
+        if (float(self.W+self.initBB[0])/self.initFRAME.shape[0])>0.99:
+            print('REMOVING too close to boundary')
+            print('self.W',self.W)
+            print('self.initBB[0]',self.initBB[0])
+            print('self.initFRAME.shape[0]',self.initFRAME.shape[0])
+            print(float(self.W+self.initBB[0])/self.initFRAME.shape[0])
+            self.score=0
+        if (float(self.H+self.initBB[1])/self.initFRAME.shape[1])>0.99:
+            print('REMOVING too close to boundary')
+            print('self.H',self.H)
+            print('self.initBB[1]',self.initBB[1])
+            print('self.initFRAME.shape[1]',self.initFRAME.shape[1])
+            print(float(self.H+self.initBB[1])/self.initFRAME.shape[1])
+            self.score=0            
+    def cosine_sim(self):
+        self.chipA=self.convert_frame_chip(self.initFRAME_OG,self.initBB_OG)
+        self.chipB=self.convert_frame_chip(self.initFRAME,self.initBB)
+        chipA_flat=self.chipA.flatten()/255
+        chipB_flat=self.chipB.flatten()/255
+
+        self.similarity = -1 * (spatial.distance.cosine(chipA_flat, chipB_flat) - 1)
+        self.check_size()
+        #print('max_H/min_H = ',self.max_H/self.min_H)
+        #print('max_H/min_H = ',self.max_W/self.min_W)
+def convert_box_xminyminxmaxymax(frame,box):
+    xmin_i=max(0,box[0])
+    xmax_i=min(frame.shape[1],box[0]+box[2])
+    ymin_i=max(0,box[1])
+    ymax_i=min(frame.shape[0],box[1]+box[3])
+    box=(xmin_i,ymin_i,xmax_i,ymax_i)
+    return box
 
 class WindowMixin(object):
 
@@ -183,13 +355,29 @@ class MainWindow(QMainWindow, WindowMixin):
         self.undiffc_button_keep.stateChanged.connect(self.button_state_unkeep)
         self.undiffc_button_keep.setShortcut('U') #H for hard
 
-        # Create a widget to keep yolov7 button #edit sjs
-        self.yolov7_button=QCheckBox('use YoloV7 [Y]')
-        self.yolov7_button.setChecked(False)
-        self.yolov7_button.stateChanged.connect(self.button_state_yolov7)
-        self.yolov7_button.setShortcut('Y') #H for hard
+        # Create a widget to keep yolo button #edit sjs
+        self.yolo_button=QCheckBox('use Yolo [Y]')
+        self.yolo_button.setChecked(False)
+        self.yolo_button.stateChanged.connect(self.button_state_yolo)
+        self.yolo_button.setShortcut('Y') #H for hard
         self.boxes_received=[]
         self.use_socket=False
+
+        # TRACKER LIST
+        self.tracker_button=QCheckBox('use Tracker [T]')
+        self.tracker_button.setChecked(False)
+        self.tracker_button.stateChanged.connect(self.button_state_tracker)
+        self.tracker_button.setShortcut('T')
+        self.tracker_dic={} #edit sjs
+        self.track_count=0 #edit sjs
+
+        # CLEAR_TRACKER LIST
+        self.remove_tracker_button=QCheckBox('use Remove Tracks [R]')
+        self.remove_tracker_button.setChecked(False)
+        self.remove_tracker_button.stateChanged.connect(self.button_state_remove_tracker)
+        self.remove_tracker_button.setShortcut('R')
+        self.remove_tracker_list=[]
+
 
         # Add some of widgets to list_layout
         list_layout.addWidget(self.edit_button)
@@ -200,7 +388,9 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout.addWidget(self.edit_mode_button) #edit SJS
         list_layout.addWidget(self.diffc_button_keep) #edit SJS
         list_layout.addWidget(self.undiffc_button_keep) #edit SJS
-        list_layout.addWidget(self.yolov7_button) #edit SJS
+        list_layout.addWidget(self.yolo_button) #edit SJS
+        list_layout.addWidget(self.tracker_button) #edit SJS
+        list_layout.addWidget(self.remove_tracker_button) #edit SJS
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -855,6 +1045,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
             except:
                 pass
+ 
     # Add steven
     def button_state_unkeep(self, item=None):
         """ Function to handle difficult examples
@@ -920,9 +1111,56 @@ class MainWindow(QMainWindow, WindowMixin):
         except:
             pass
     # edit SJS
-    def button_state_yolov7(self, item=None): #edit sjs
-        """ Function to handle incoming yolov7 detections to update on each object """
-        print('called button_state_yolov7')
+    def button_state_yolo(self, item=None): #edit sjs
+        """ Function to handle incoming yolo detections to update on each object """
+        print('called button_state_yolo')
+
+    # edit SJS
+    def button_state_tracker(self, item=None): #edit sjs
+        """ Function to handle incoming yolo detections to update on each object """
+        print('called button_state_tracker')
+        if self.remove_tracker_button.isChecked():
+            self.remove_tracker_button.setChecked(False)
+        
+        self.canvas.update_tracker=self.update_tracker
+        self.canvas.update_tracker()
+
+    # edit SJS
+    def button_state_remove_tracker(self, item=None): #edit sjs
+        """ Function to handle incoming yolo detections to update on each object """
+        print('called button_state_remove_tracker')
+        if self.tracker_button.isChecked():
+            self.tracker_button.setChecked(False)
+
+        self.tracker_dic={}
+        for track_id in self.tracker_dic.keys():
+            self.remove_tracker_list.append(track_id)
+        
+        print('self.remove_tracker_list',self.remove_tracker_list)
+        if self.remove_tracker_button.isChecked():
+            for i in range(self.label_list.count()):
+                        item=self.label_list.item(i)
+
+                        try:
+                            shape = self.items_to_shapes[item]
+                            if shape.track_id!='0':
+                                self.remove_tracker_list.append(shape.track_id)
+                            
+                        except:
+                            pass
+                            pass
+                        # Checked and Update
+                        try:
+                            if shape.track_id in self.remove_tracker_list:
+                                self.canvas.selected_shape=shape
+                                self.delete_selected_shape()
+                                #shape.track_id = '0'
+                                self.set_dirty()
+                            else:  # User probably changed item visibility
+                                self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
+                        except:
+                            pass
+
 
     # edit SJS
     def button_state_lockvertex(self, item=None): #edit sjs
@@ -966,6 +1204,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.edit.setEnabled(selected)
         self.actions.shapeLineColor.setEnabled(selected)
         self.actions.shapeFillColor.setEnabled(selected)
+        
+
 
     def add_label(self, shape):
         shape.paint_label = self.display_label_option.isChecked()
@@ -1135,6 +1375,7 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             text = self.default_label
 
+
         # Add Chris
         self.diffc_button.setChecked(False)
         if text is not None:
@@ -1154,6 +1395,13 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             # self.canvas.undoLastLine()
             self.canvas.reset_all_lines()
+        if self.tracker_button.isChecked() and self.yolo_button.isChecked()==False:
+            self.save_file()
+            self.open_prev_image()
+            self.open_prev_image()
+            self.open_next_image()
+            self.open_next_image()
+
 
     def scroll_request(self, delta, orientation):
         units = - delta / (8 * 15)
@@ -1406,6 +1654,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.adjustSize()
         self.canvas.update()
 
+
     def adjust_scale(self, initial=False):
         value = self.scalers[self.FIT_WINDOW if initial else self.zoom_mode]()
         self.zoom_widget.setValue(int(100 * value))
@@ -1461,9 +1710,11 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_LABEL_FILE_FORMAT] = self.label_file_format
         settings.save()
 
+
     def load_recent(self, filename):
         if self.may_continue():
             self.load_file(filename)
+
 
     def scan_all_images(self, folder_path):
         extensions = ['.%s' % fmt.data().decode("ascii").lower() for fmt in QImageReader.supportedImageFormats()]
@@ -1562,6 +1813,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.paint_canvas()
             self.save_file()
 
+
     def open_prev_image(self, _value=False):
         # Proceeding prev image without dialog if having any label
         if self.auto_saving.isChecked():
@@ -1618,9 +1870,10 @@ class MainWindow(QMainWindow, WindowMixin):
                 filename = self.m_img_list[self.cur_img_idx]
         if filename:
             self.load_file(filename)
-        if self.yolov7_button.isChecked(): #edit sjs
+
+        if self.yolo_button.isChecked(): #edit sjs
             if filename:
-                print('Sending image to Yolov7')
+                print('Sending image to yolo')
                 if os.path.exists('tmp_yolo'):
                     os.system('rm -rf tmp_yolo')
                 os.makedirs('tmp_yolo')
@@ -1659,20 +1912,11 @@ class MainWindow(QMainWindow, WindowMixin):
                         ready.put(True)
                     while xy.empty():
                         pass
-                        #myboxes=python_server.get_timed_out(xy,5)
-                        #if myboxes=='timed_out':
-                        #    break
-                        #else:
-                         #   full_boxes_i=myboxes
-                         #   xy.put(full_boxes_i)
-                         #   break
-                        #print(myboxes)
 
-                    #if myboxes!='timed_out':
                     full_boxes_i=xy.get()
-                    print('full_boxes_i',full_boxes_i)
+                    #print('full_boxes_i',full_boxes_i)
                     boxes_received=python_server.convert_boxes(full_boxes_i)
-                    print(f'LABELIMG received: {boxes_received}')
+                    #print(f'LABELIMG received: {boxes_received}')
                     self.boxes_received=boxes_received
                     if len(self.boxes_received)>0:
                         shapes=[]
@@ -1697,23 +1941,223 @@ class MainWindow(QMainWindow, WindowMixin):
                         self.save_file()
                         self.canvas.verified = True
                     self.boxes_received=[]
-
-
-
-
-                    
-
                 except:
                     print(xy.empty())
-                    print('not connected to Yolov7 yet')
+                    print('not connected to Yolo yet')
 
 
         if self.diffc_button_keep.isChecked() and not(self.undiffc_button_keep.isChecked()):
             self.diffc_button.setChecked(True)
         elif self.undiffc_button_keep.isChecked():
             self.diffc_button.setChecked(False)
-        
 
+        if self.tracker_button.isChecked():
+            self.update_tracker()
+        self.shape_dic={}
+        self.shape_dic_lookup={}
+        for i in range(self.label_list.count()):
+                                item=self.label_list.item(i)
+
+                                try:
+                                    shape = self.items_to_shapes[item]   
+                                    xmin=int(shape.points[0].x())
+                                    ymin=int(shape.points[0].y())
+                                    xmax=int(shape.points[2].x())
+                                    ymax=int(shape.points[3].y())
+                                    #print(xmin,ymin,xmax,ymax)
+                                    #print(label)
+                                    #print(confidence)
+                                    initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))   
+                                    if shape.track_id!='0':
+                                        self.shape_dic[shape.track_id]=initBB 
+                                        self.shape_dic_lookup[shape.track_id]=shape                         
+                                except:
+                                    pass
+        for k,v in self.shape_dic.items():
+            iou_list=[bb_intersection(v,self.shape_dic[w]) for w in self.shape_dic.keys()]
+            for iou in iou_list:
+                if iou>0.0:
+                    self.remove_tracker_list.append(k)
+                    if k in self.tracker_dic.keys():
+                        self.tracker_dic.pop(k)
+                    self.canvas.selected_shape=self.shape_dic_lookup[k]
+                    self.delete_selected_shape()
+                    #shape.track_id = '0'
+                    self.set_dirty()
+    
+        for i in range(self.label_list.count()):
+                                item=self.label_list.item(i)
+
+                                try:
+                                    shape = self.items_to_shapes[item]                             
+                                except:
+                                    pass
+
+                                try:
+                                    xmin=int(shape.points[0].x())
+                                    ymin=int(shape.points[0].y())
+                                    xmax=int(shape.points[2].x())
+                                    ymax=int(shape.points[3].y())
+                                    #print(xmin,ymin,xmax,ymax)
+                                    #print(label)
+                                    #print(confidence)
+                                    initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))
+                                    # Checked and Update
+                                    if shape.track_id in self.remove_tracker_list:
+                                        self.canvas.selected_shape=shape
+                                        self.delete_selected_shape()
+                                        #shape.track_id = '0'
+                                        self.set_dirty()
+                                    else:  # User probably changed item visibility
+                                        self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
+                                except:
+                                    print('Issue with shape')
+                                    pass
+        if self.remove_tracker_button.isChecked():
+            for i in range(self.label_list.count()):
+                        item=self.label_list.item(i)
+
+                        try:
+                            shape = self.items_to_shapes[item]
+                            if shape.track_id!='0':
+                                self.remove_tracker_list.append(shape.track_id)
+                            
+                        except:
+                            pass
+                            pass
+                        # Checked and Update
+                        try:
+                            if shape.track_id in self.remove_tracker_list:
+                                self.canvas.selected_shape=shape
+                                self.delete_selected_shape()
+                                #shape.track_id = '0'
+                                self.set_dirty()
+                            else:  # User probably changed item visibility
+                                self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
+                        except:
+                            pass
+
+ 
+
+                            
+
+    def create_new_track(self,time_i,label,difficult,confidence,xmin,ymin,xmax,ymax,points,initBB,initFRAME):
+        self.tracker_dic[time_i]=CUSTOM_TRACKER()
+        self.tracker_dic[time_i].label=label
+        self.tracker_dic[time_i].difficult=difficult
+        self.tracker_dic[time_i].confidence=confidence
+        track_id=time_i
+        points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+        self.tracker_dic[time_i].points=points
+        self.tracker_dic[time_i].shape=(label, points, None, None, difficult,confidence,track_id)
+        self.tracker_dic[time_i].custom=True
+        self.tracker_dic[time_i].initBB=initBB
+        self.tracker_dic[time_i].labelBB=label
+        self.tracker_dic[time_i].initFRAME=initFRAME
+        print(initBB)
+        self.tracker_dic[time_i].tracker.init(initFRAME, initBB)
+        self.tracker_dic[time_i].grab_initOG()
+        self.tracker_dic[time_i].track_id=time_i       
+
+    def update_tracker(self):
+        filename=self.m_img_list[self.cur_img_idx]
+        initFRAME=cv2.imread(filename)
+        for j in range(2):
+            for i,shape in enumerate(self.canvas.shapes):
+                label=shape.label
+                points=shape.points
+                difficult=shape.difficult
+                confidence=shape.confidence
+                track_id=str(shape.track_id)
+                #print('track_id=',track_id)
+                xmin=int(shape.points[0].x())
+                ymin=int(shape.points[0].y())
+                xmax=int(shape.points[2].x())
+                ymax=int(shape.points[3].y())
+                #print(xmin,ymin,xmax,ymax)
+                #print(label)
+                #print(confidence)
+                initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))
+                time_i=str(time.time()).replace('.','')[-4:]
+                #print('time_i is numeric?',time_i.isnumeric())
+                if track_id=='0':
+                    track_id=time_i
+
+                ADD_TRACK=True
+                self.tracker_dic_copy=self.tracker_dic.copy()
+                if track_id not in self.tracker_dic_copy.keys():
+                    if len(self.tracker_dic.keys())>0:
+                        iou_list=[bb_intersection(initBB,self.tracker_dic[w].initBB) for w in self.tracker_dic.keys()]
+                        for iou in iou_list:
+                            #print(iou)
+                            if iou>0.0:
+                                #print('NOT ADDING THIS TRACK')
+                                ADD_TRACK=False
+                    if track_id!=time_i:
+                        time_i=track_id
+                    if ADD_TRACK:
+                        self.create_new_track(time_i,label,difficult,confidence,xmin,ymin,xmax,ymax,points,initBB,initFRAME)
+                #elif track_id!='0' and track_id!=time_i:
+                if ADD_TRACK:
+                    if self.tracker_dic[track_id].initBB!=initBB:
+                        #print("SAW YOU MOVED")
+                        self.tracker_dic[track_id].create_tracker()
+                        self.tracker_dic[track_id].initBB=initBB
+                        self.tracker_dic[track_id].initFRAME=initFRAME
+                        self.tracker_dic[track_id].tracker.init(initFRAME, initBB)
+                        if self.tracker_dic[track_id].count==0:
+                            self.tracker_dic[track_id].grab_initOG()
+                    (success, box) = self.tracker_dic[track_id].tracker.update(initFRAME)
+                    if success:
+                        self.tracker_dic[track_id].grab_frame(initFRAME,box)
+                        self.tracker_dic[track_id].cosine_sim()
+                        if self.tracker_dic[track_id].similarity<self.tracker_dic[track_id].cosine_THRESHOLD:
+                            #print('REMOVING box due to low COSINE SIMILARITY')
+                            self.tracker_dic[track_id].score=0
+                        #print('similarity=',self.tracker_dic[track_id].similarity)
+                        self.tracker_dic[track_id].count+=1
+                        (x, y, w, h) = [int(v) for v in box]
+                        (xmin,ymin,xmax,ymax)=convert_box_xminyminxmaxymax(initFRAME,box)
+                        points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
+                        self.tracker_dic[track_id].points=points
+                        label=self.tracker_dic[track_id].label
+                        difficult=self.tracker_dic[track_id].difficult
+                        confidence=self.tracker_dic[track_id].confidence
+                        self.tracker_dic[track_id].shape=(label, points, None, None, difficult,confidence,track_id)
+                        shape=self.tracker_dic[track_id].shape
+                        if self.tracker_dic[track_id].count<j+1:
+                            for i in range(2):
+                                self.tracker_dic[track_id].update_tracks()
+                        elif j<2:
+                            self.tracker_dic[track_id].update_tracks()
+                        #self.tracker_dic[track_id].update_tracks()
+                        #updated_shapes.append(shape)
+                        #print('shape',shape)
+                    else:
+                        self.tracker_dic.pop(track_id)
+            bad_list=[]
+            track_check=[]
+            for track_id in self.tracker_dic.keys():
+                ious=[bb_intersection(self.tracker_dic[track_id].initBB,self.tracker_dic[w].initBB) for w in self.tracker_dic.keys() if w!=track_id and track_id not in track_check]
+                track_check.append(track_id)
+                if self.tracker_dic[track_id].score==0:
+                    bad_list.append(track_id)
+                for iou in ious:
+                            #print(iou)
+                            if iou>0.0:
+                                #print('REMOVING THIS TRACK')
+                                bad_list.append(track_id)
+            for bad_track in bad_list:
+                self.tracker_dic.pop(bad_track)
+
+            updated_shapes=[]
+            for track_id in self.tracker_dic.keys():
+                shape=self.tracker_dic[track_id].shape
+                #print(shape)
+                updated_shapes.append(shape)
+            self.load_labels(updated_shapes)
+            self.save_file()
+            self.canvas.verified = True
 
 
     def open_file(self, _value=False):
@@ -1838,6 +2282,12 @@ class MainWindow(QMainWindow, WindowMixin):
             self.set_dirty()
 
     def delete_selected_shape(self):
+        #edit sjs
+        if self.canvas.selected_shape.track_id in self.tracker_dic.keys():
+            self.remove_tracker_list.append(self.canvas.selected_shape.track_id)
+            self.tracker_dic.pop(self.canvas.selected_shape.track_id)
+            print('removing from tracker dic')
+            
         self.remove_label(self.canvas.delete_selected())
         self.set_dirty()
         if self.no_shapes():
@@ -1863,7 +2313,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def copy_shape(self):
         if self.canvas.selected_shape is None:
             # True if one accidentally touches the left mouse button before releasing
-            return
+            return      
         self.canvas.end_move(copy=True)
         self.add_label(self.canvas.selected_shape)
         self.set_dirty()
@@ -1871,6 +2321,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def move_shape(self):
         self.canvas.end_move(copy=False)
         self.set_dirty()
+
+
 
     def load_predefined_classes(self, predef_classes_file):
         if os.path.exists(predef_classes_file) is True:

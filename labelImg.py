@@ -66,8 +66,8 @@ import time
 def bb_intersection(boxA,boxB):
     xA=max(boxA[0],boxB[0])
     yA=max(boxA[1],boxB[1])
-    xB=min(boxA[2],boxB[2])
-    yB=min(boxA[3],boxB[3])
+    xB=min(boxA[2]+boxA[0],boxB[2]+boxB[0])
+    yB=min(boxA[3]+boxA[1],boxB[3]+boxB[1])
     interArea=max(0,xB-xA+1)*max(0,yB-yA+1)
     boxAArea=(boxA[2]-boxA[0]+1)*(boxA[3]-boxA[1]+1)
     boxBArea=(boxB[2]-boxB[0]+1)*(boxB[3]-boxB[1]+1)
@@ -76,6 +76,7 @@ def bb_intersection(boxA,boxB):
         iou=interArea/float(boxAArea+boxBArea-interArea)
     else:
         iou=1
+    print('iou calc=',iou)
     return iou
 class CUSTOM_TRACKER:
     def __init__(self):
@@ -175,19 +176,21 @@ class CUSTOM_TRACKER:
         ymin_i=max(0,bbox_i[1])
         ymax_i=min(jpg_i.shape[0],bbox_i[1]+bbox_i[3])
         #longest=max(ymax_i-ymin_i,xmax_i-xmin_i)
-
-        chip_i=jpg_i[ymin_i:ymax_i,xmin_i:xmax_i,:]
+        if len(jpg_i.shape)==3:
+            chip_i=jpg_i[ymin_i:ymax_i,xmin_i:xmax_i,:]
+        elif len(jpg_i.shape)==2:
+            chip_i=jpg_i[ymin_i:ymax_i,xmin_i:xmax_i]
         chip_square_i=Image.fromarray(chip_i)
-        self.W=self.initBB[2]
-        self.H=self.initBB[3]
-        chip_square_i=chip_square_i.resize((self.W,self.H),Image.ANTIALIAS)
+        W=self.initBB[2]
+        H=self.initBB[3]
+        chip_square_i=chip_square_i.resize((W,H),Image.ANTIALIAS)
         chip_square_i=np.array(chip_square_i)
         return chip_square_i
     def check_size(self):
-        self.W_OG=self.initBB_OG[2]-self.initBB_OG[0]
-        self.H_OG=self.initBB_OG[3]-self.initBB_OG[1]
-        self.W=self.initBB[2]-self.initBB[0]
-        self.H=self.initBB[3]-self.initBB[1]
+        self.W_OG=self.initBB_OG[2]
+        self.H_OG=self.initBB_OG[3]
+        self.W=self.initBB[2]
+        self.H=self.initBB[3]
         self.min_W=float(min(self.W_OG,self.W))
         self.min_H=float(min(self.H_OG,self.H))
         self.max_W=float(max(self.W_OG,self.W))
@@ -200,20 +203,20 @@ class CUSTOM_TRACKER:
             print('max_W/min_W = ',self.max_W/self.min_W)
             print(f'REMOVING due to THRESHOLD = {self.THRESHOLD_W}')
             self.score=0
-        if (float(self.W+self.initBB[0])/self.initFRAME.shape[0])>0.99:
-            print('REMOVING too close to boundary')
-            print('self.W',self.W)
-            print('self.initBB[0]',self.initBB[0])
-            print('self.initFRAME.shape[0]',self.initFRAME.shape[0])
-            print(float(self.W+self.initBB[0])/self.initFRAME.shape[0])
-            self.score=0
-        if (float(self.H+self.initBB[1])/self.initFRAME.shape[1])>0.99:
-            print('REMOVING too close to boundary')
-            print('self.H',self.H)
-            print('self.initBB[1]',self.initBB[1])
-            print('self.initFRAME.shape[1]',self.initFRAME.shape[1])
-            print(float(self.H+self.initBB[1])/self.initFRAME.shape[1])
-            self.score=0            
+        # if (float(self.W+self.initBB[0])/self.initFRAME.shape[0])>0.99:
+        #     print('REMOVING too close to boundary')
+        #     print('self.W',self.W)
+        #     print('self.initBB[0]',self.initBB[0])
+        #     print('self.initFRAME.shape[0]',self.initFRAME.shape[0])
+        #     print(float(self.W+self.initBB[0])/self.initFRAME.shape[0])
+        #     self.score=0
+        # if (float(self.H+self.initBB[1])/self.initFRAME.shape[1])>0.99:
+        #     print('REMOVING too close to boundary')
+        #     print('self.H',self.H)
+        #     print('self.initBB[1]',self.initBB[1])
+        #     print('self.initFRAME.shape[1]',self.initFRAME.shape[1])
+        #     print(float(self.H+self.initBB[1])/self.initFRAME.shape[1])
+        #     self.score=0            
     def cosine_sim(self):
         self.chipA=self.convert_frame_chip(self.initFRAME_OG,self.initBB_OG)
         self.chipB=self.convert_frame_chip(self.initFRAME,self.initBB)
@@ -222,8 +225,8 @@ class CUSTOM_TRACKER:
 
         self.similarity = -1 * (spatial.distance.cosine(chipA_flat, chipB_flat) - 1)
         self.check_size()
-        #print('max_H/min_H = ',self.max_H/self.min_H)
-        #print('max_H/min_H = ',self.max_W/self.min_W)
+        print('max_H/min_H = ',self.max_H/self.min_H)
+        print('max_W/min_W = ',self.max_W/self.min_W)
 def convert_box_xminyminxmaxymax(frame,box):
     xmin_i=max(0,box[0])
     xmax_i=min(frame.shape[1],box[0]+box[2])
@@ -1952,12 +1955,11 @@ class MainWindow(QMainWindow, WindowMixin):
             self.diffc_button.setChecked(False)
 
         if self.tracker_button.isChecked():
-            self.update_tracker()
+            self.update_tracker()  
         self.shape_dic={}
-        self.shape_dic_lookup={}
+        self.shape_dic_items={}
         for i in range(self.label_list.count()):
                                 item=self.label_list.item(i)
-
                                 try:
                                     shape = self.items_to_shapes[item]   
                                     xmin=int(shape.points[0].x())
@@ -1969,31 +1971,36 @@ class MainWindow(QMainWindow, WindowMixin):
                                     #print(confidence)
                                     initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))   
                                     if shape.track_id!='0':
-                                        self.shape_dic[shape.track_id]=initBB 
-                                        self.shape_dic_lookup[shape.track_id]=shape                         
+                                        self.shape_dic_items[i]=shape
+                                        self.shape_dic[i]=initBB                     
                                 except:
+                                    print('ERROR')
                                     pass
-        for k,v in self.shape_dic.items():
-            iou_list=[bb_intersection(v,self.shape_dic[w]) for w in self.shape_dic.keys()]
+        for k,shape in self.shape_dic_items.items():
+            track_id=shape.track_id
+            initBB=self.shape_dic[k]
+            iou_list=[bb_intersection(initBB,initBB_i) for i,initBB_i in self.shape_dic.items() if self.shape_dic_items[i].track_id!=track_id]
             for iou in iou_list:
                 if iou>0.0:
-                    self.remove_tracker_list.append(k)
-                    if k in self.tracker_dic.keys():
-                        self.tracker_dic.pop(k)
-                    self.canvas.selected_shape=self.shape_dic_lookup[k]
-                    self.delete_selected_shape()
-                    #shape.track_id = '0'
-                    self.set_dirty()
-    
-        for i in range(self.label_list.count()):
-                                item=self.label_list.item(i)
+                    self.remove_tracker_list.append(track_id)
+                    if track_id in self.tracker_dic.keys():
+                        self.tracker_dic.pop(track_id)
+                    if shape in self.canvas.shapes:
+                        self.canvas.selected_shape=shape
+                        self.delete_selected_shape()
+                        #shape.track_id = '0'
+                        self.set_dirty()
+        if self.remove_tracker_button.isChecked() or self.tracker_button.isChecked():
+            for i in range(self.label_list.count()):
+                                    item=self.label_list.item(i)
+                                    try:
+                                        shape = self.items_to_shapes[item]   
+                                        if shape.track_id!='0' and self.tracker_button.isChecked()==False:
+                                            self.remove_tracker_list.append(shape.track_id)                          
+                                    except:
+                                        pass
 
-                                try:
-                                    shape = self.items_to_shapes[item]                             
-                                except:
-                                    pass
-
-                                try:
+                                    #try:
                                     xmin=int(shape.points[0].x())
                                     ymin=int(shape.points[0].y())
                                     xmax=int(shape.points[2].x())
@@ -2001,44 +2008,20 @@ class MainWindow(QMainWindow, WindowMixin):
                                     #print(xmin,ymin,xmax,ymax)
                                     #print(label)
                                     #print(confidence)
-                                    initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))
+                                    initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))  
                                     # Checked and Update
-                                    if shape.track_id in self.remove_tracker_list:
+                                    if shape.track_id in self.remove_tracker_list and shape in self.canvas.shapes:
                                         self.canvas.selected_shape=shape
                                         self.delete_selected_shape()
                                         #shape.track_id = '0'
                                         self.set_dirty()
                                     else:  # User probably changed item visibility
                                         self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
-                                except:
-                                    print('Issue with shape')
-                                    pass
-        if self.remove_tracker_button.isChecked():
-            for i in range(self.label_list.count()):
-                        item=self.label_list.item(i)
-
-                        try:
-                            shape = self.items_to_shapes[item]
-                            if shape.track_id!='0':
-                                self.remove_tracker_list.append(shape.track_id)
-                            
-                        except:
-                            pass
-                            pass
-                        # Checked and Update
-                        try:
-                            if shape.track_id in self.remove_tracker_list:
-                                self.canvas.selected_shape=shape
-                                self.delete_selected_shape()
-                                #shape.track_id = '0'
-                                self.set_dirty()
-                            else:  # User probably changed item visibility
-                                self.canvas.set_shape_visible(shape, item.checkState() == Qt.Checked)
-                        except:
-                            pass
-
- 
-
+                                    #except:
+                                        #print('Issue with shape')
+                                    #    pass
+        if self.tracker_button.isChecked():
+            self.update_tracker()                       
                             
 
     def create_new_track(self,time_i,label,difficult,confidence,xmin,ymin,xmax,ymax,points,initBB,initFRAME):
@@ -2062,7 +2045,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def update_tracker(self):
         filename=self.m_img_list[self.cur_img_idx]
         initFRAME=cv2.imread(filename)
-        for j in range(2):
+        for j in range(1):
+            track_check1=[]
             for i,shape in enumerate(self.canvas.shapes):
                 label=shape.label
                 points=shape.points
@@ -2077,25 +2061,31 @@ class MainWindow(QMainWindow, WindowMixin):
                 #print(xmin,ymin,xmax,ymax)
                 #print(label)
                 #print(confidence)
-                initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))
-                time_i=str(time.time()).replace('.','')[-4:]
+                initBB=(int(xmin),int(ymin),int(xmax-xmin),int(ymax-ymin))  
+                time_i=str(time.time()).replace('.','')[-6:]
                 #print('time_i is numeric?',time_i.isnumeric())
-                if track_id=='0':
-                    track_id=time_i
+                
 
                 ADD_TRACK=True
+                if track_id=='0':
+                    track_id=time_i
                 self.tracker_dic_copy=self.tracker_dic.copy()
                 if track_id not in self.tracker_dic_copy.keys():
                     if len(self.tracker_dic.keys())>0:
-                        iou_list=[bb_intersection(initBB,self.tracker_dic[w].initBB) for w in self.tracker_dic.keys()]
+                        track_check1.append(track_id)
+                        iou_list=[bb_intersection(initBB,self.tracker_dic[w].initBB) for w in self.tracker_dic.keys() if self.tracker_dic[w].track_id!=track_id and w not in track_check1] 
                         for iou in iou_list:
-                            #print(iou)
+                            print(iou)
                             if iou>0.0:
                                 #print('NOT ADDING THIS TRACK')
                                 ADD_TRACK=False
+
                     if track_id!=time_i:
                         time_i=track_id
                     if ADD_TRACK:
+                        for track_x in self.tracker_dic.keys():
+                            print('current initBBs',self.tracker_dic[track_x].initBB)
+                            print('this initBB',initBB)
                         self.create_new_track(time_i,label,difficult,confidence,xmin,ymin,xmax,ymax,points,initBB,initFRAME)
                 #elif track_id!='0' and track_id!=time_i:
                 if ADD_TRACK:
@@ -2126,7 +2116,7 @@ class MainWindow(QMainWindow, WindowMixin):
                         self.tracker_dic[track_id].shape=(label, points, None, None, difficult,confidence,track_id)
                         shape=self.tracker_dic[track_id].shape
                         if self.tracker_dic[track_id].count<j+1:
-                            for i in range(2):
+                            for i in range(1):
                                 self.tracker_dic[track_id].update_tracks()
                         elif j<2:
                             self.tracker_dic[track_id].update_tracks()

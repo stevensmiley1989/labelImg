@@ -63,7 +63,7 @@ def init(xy,ready,response,PORT=PORT):
         s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         #s.settimeout(0.5) #settimeout
         s.bind((HOST,PORT))
-        s.listen(500)
+        s.listen(5000)
         while True:
             conn,addr=s.accept()
             start_new_thread(threaded_client,(conn,xy,response,ready,))

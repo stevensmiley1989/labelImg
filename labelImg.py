@@ -76,8 +76,70 @@ def bb_intersection(boxA,boxB):
         iou=interArea/float(boxAArea+boxBArea-interArea)
     else:
         iou=1
-    print('iou calc=',iou)
+    #print('iou calc=',iou)
     return iou
+import tkinter as tk
+
+class popupWindowChangeLabels(object):
+    def __init__(self,dic_i):
+
+       
+
+        self.top=tk.Tk()
+        self.root=self.top
+        master=self.top
+        self.root_H=int(master.winfo_screenheight()*0.45)
+        self.root_W=int(master.winfo_screenwidth()*0.45)
+        self.top.geometry( "{}x{}".format(self.root_W,self.root_H) )
+        self.top.configure(background = 'black')
+        #self.get_update_background_img()
+        #if _platform=='darwin':
+        self.top.lift()
+        self.new_dic={}
+        self.new_labels={}
+        self.new_Entries={}
+        options=[]
+        for k,v in dic_i.items():
+            row_i="{}: {}".format(k,v)
+            #print(row_i)
+            options.append(row_i)
+        self.dic_i=dic_i
+        self.new_labels_og=tk.Label(self.top,text="ORIGINAL VALUE",bg='green', fg='black',font=("Arial", 8))
+        self.new_labels_og.grid(row=0,column=1,sticky='se')
+        self.new_labels_new=tk.Label(self.top,text="NEW VALUE",bg='green', fg='black',font=("Arial", 8))
+        self.new_labels_new.grid(row=0,column=2,sticky='s')
+        ii=0
+        j=0
+        for i,(k,v) in enumerate(dic_i.items()):
+            i+=1
+            if i%25==0:
+                ii=0
+                j+=2
+            ii+=1
+            self.new_dic[k]=tk.StringVar()
+            self.new_dic[k].set(v)
+            self.new_labels[k]=tk.Label(self.top,text=k+":",bg='black', fg='green')
+            self.new_labels[k].grid(row=ii+1,column=1+j,sticky='ne')
+            self.new_Entries[k]=tk.Entry(self.top,textvariable=self.new_dic[k])
+            self.new_Entries[k].grid(row=ii+1,column=2+j,sticky='nw')
+        self.b=tk.Button(self.top,text='Submit',command=self.cleanup,bg='black',fg='green')
+        self.b.grid(row=2,column=3+j,sticky='s')
+        self.e=tk.Button(self.top,text='cancel',command=self.cancel,bg='black',fg='green')
+        self.e.grid(row=3,column=3+j,sticky='s')
+    def cleanup(self):
+        targets_dic={}
+        for i,(k,v) in enumerate(self.new_dic.items()):
+            print(k,':',v.get())
+            if v.get().strip()!='':
+                targets_dic[k]=v.get().strip()
+            else:
+                pass
+        self.value=targets_dic
+        self.top.destroy()
+    def cancel(self):
+        #self.value=str(self.clicked.get().split(':')[0])
+        self.value=self.dic_i
+        self.top.destroy()
 class CUSTOM_TRACKER:
     def __init__(self):
         self.create_tracker()
@@ -381,6 +443,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.remove_tracker_button.setShortcut('R')
         self.remove_tracker_list=[]
 
+        # INCOMING LABEL REPLACE LIST
+        self.replace_label_button=QCheckBox('Change Incoming Label Names from Yolo [N]')
+        self.replace_label_button.setChecked(False)
+        self.replace_label_button.stateChanged.connect(self.button_state_replace_label)
+        self.replace_label_button.setShortcut('N')
+        self.replace_label_dic={}
+
 
         # Add some of widgets to list_layout
         list_layout.addWidget(self.edit_button)
@@ -392,8 +461,10 @@ class MainWindow(QMainWindow, WindowMixin):
         list_layout.addWidget(self.diffc_button_keep) #edit SJS
         list_layout.addWidget(self.undiffc_button_keep) #edit SJS
         list_layout.addWidget(self.yolo_button) #edit SJS
+        list_layout.addWidget(self.replace_label_button) #edit SJS
         list_layout.addWidget(self.tracker_button) #edit SJS
         list_layout.addWidget(self.remove_tracker_button) #edit SJS
+
 
         # Create and add combobox for showing unique labels in group
         self.combo_box = ComboBox(self)
@@ -1130,7 +1201,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
     # edit SJS
     def button_state_remove_tracker(self, item=None): #edit sjs
-        """ Function to handle incoming yolo detections to update on each object """
+        """ Function to handle removing tracks from tracker """
         print('called button_state_remove_tracker')
         if self.tracker_button.isChecked():
             self.tracker_button.setChecked(False)
@@ -1164,6 +1235,12 @@ class MainWindow(QMainWindow, WindowMixin):
                         except:
                             pass
 
+    # edit SJS
+    def button_state_replace_label(self, item=None): #edit sjs
+        """ Function to handle incoming yolo detections to update on each object label names """
+        print('called button_state_replace_label')
+        self.replace_label_dic=self.popup_changelabels(self.replace_label_dic)
+        print("NEW replace_label_dic",self.replace_label_dic)
 
     # edit SJS
     def button_state_lockvertex(self, item=None): #edit sjs
@@ -1925,6 +2002,10 @@ class MainWindow(QMainWindow, WindowMixin):
                         shapes=[]
                         for boundingboxes_i in self.boxes_received:
                             label=boundingboxes_i['obj_found']
+                            if label not in self.replace_label_dic.keys():
+                                print('new label from yolo:',label)
+                                self.replace_label_dic[label]=label
+                            label=self.replace_label_dic[label] #in case we wanted to change these as they come in
                             xmin=int(boundingboxes_i['xmin'])
                             ymin=int(boundingboxes_i['ymin'])
                             xmax=int(boundingboxes_i['xmax'])
@@ -2149,6 +2230,20 @@ class MainWindow(QMainWindow, WindowMixin):
             self.save_file()
             self.canvas.verified = True
 
+    def popup_changelabels(self,replace_label_dic):
+            if len(self.replace_label_dic)>0:
+                #self.root_tk=tk.Tk()
+                #self.root_tk.title('Select the new object name from the dropdown')
+                #original_root_tk=self.root_tk
+                self.POPUP=popupWindowChangeLabels(replace_label_dic)
+                
+                self.POPUP.root.wait_window(self.POPUP.top)
+                self.replace_label_dic=self.POPUP.value
+                #self.root_tk.destroy()
+                #self.root_tk.title("LabelImg")
+                if self.replace_label_button.isChecked():
+                    self.replace_label_button.setChecked(False)
+            return self.replace_label_dic
 
     def open_file(self, _value=False):
         if not self.may_continue():

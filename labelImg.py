@@ -313,9 +313,18 @@ class WindowMixin(object):
         if actions:
             add_actions(toolbar, actions)
         self.addToolBar(Qt.LeftToolBarArea, toolbar)
+        toolbar.setStyleSheet("background-color:gray;")
         return toolbar
 
+class Color(QWidget):
 
+    def __init__(self, color):
+        super(Color, self).__init__()
+        self.setAutoFillBackground(True)
+
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(color))
+        self.setPalette(palette)
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
 
@@ -323,6 +332,11 @@ class MainWindow(QMainWindow, WindowMixin):
         super(MainWindow, self).__init__()
         self.setWindowTitle(__appname__)
 
+        #edit sjs
+        self.setStyleSheet("background-color: black;"
+        "selection-color: green;"
+        "selection-background-color: black;"
+        "color:lime;") #edit sjs
         # Load setting in the main thread
         self.settings = Settings()
         self.settings.load()
@@ -369,10 +383,14 @@ class MainWindow(QMainWindow, WindowMixin):
         self.prev_label_text = ''
 
         list_layout = QVBoxLayout()
+        
         list_layout.setContentsMargins(0, 0, 0, 0)
+
 
         # Create a widget for using default label
         self.use_default_label_checkbox = QCheckBox(get_str('useDefaultLabel'))
+        self.use_default_label_checkbox.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.use_default_label_checkbox.setChecked(False)
         self.default_label_combo_box = DefaultLabelComboBox(self,items=self.label_hist)
 
@@ -384,44 +402,60 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Create a widget for edit and diffc button
         self.diffc_button = QCheckBox(get_str('useDifficult'))
+        self.diffc_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.diffc_button.setChecked(False)
         self.diffc_button.stateChanged.connect(self.button_state)
         self.edit_button = QToolButton()
         self.edit_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+
         
 
         # Create a widget for moving bboxes, edit SJS
         self.moveall_button = QCheckBox('MoveAll_BBOXES [M]') #edit SJS
+        self.moveall_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.moveall_button.setChecked(False) #edit SJS
         self.moveall_button.stateChanged.connect(self.button_state_moveall) #edit SJS
         self.moveall_button.setShortcut('M')
 
         # Create a widget for locking vertex when moving bboxes, edit SJS
         self.lockvertex_button = QCheckBox('lockvertex_BBOXES [L]') #edit SJS
+        self.lockvertex_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.lockvertex_button.setChecked(False) #edit SJS
         self.lockvertex_button.stateChanged.connect(self.button_state_lockvertex) #edit SJS
         self.lockvertex_button.setShortcut('L')
 
         # Create a widget for unselecting draw, edit SJS
         self.edit_mode_button = QCheckBox('editBox [B]')
+        self.edit_mode_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.edit_mode_button.setChecked(False)
         self.edit_mode_button.stateChanged.connect(self.set_edit_mode)
         self.edit_mode_button.setShortcut('B')
 
         # Create a widget to keep diffc button #edit sjs
         self.diffc_button_keep=QCheckBox('keep difficult [H]')
+        self.diffc_button_keep.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.diffc_button_keep.setChecked(False)
         self.diffc_button_keep.stateChanged.connect(self.button_state_keep)
         self.diffc_button_keep.setShortcut('H') #H for hard
 
         # Create a widget to keep diffc button #edit sjs
         self.undiffc_button_keep=QCheckBox('unkeep difficult [U]')
+        self.undiffc_button_keep.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.undiffc_button_keep.setChecked(False)
         self.undiffc_button_keep.stateChanged.connect(self.button_state_unkeep)
         self.undiffc_button_keep.setShortcut('U') #H for hard
 
         # Create a widget to keep yolo button #edit sjs
         self.yolo_button=QCheckBox('use Yolo [Y]')
+        self.yolo_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.yolo_button.setChecked(False)
         self.yolo_button.stateChanged.connect(self.button_state_yolo)
         self.yolo_button.setShortcut('Y') #H for hard
@@ -430,6 +464,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # TRACKER LIST
         self.tracker_button=QCheckBox('use Tracker [T]')
+        self.tracker_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.tracker_button.setChecked(False)
         self.tracker_button.stateChanged.connect(self.button_state_tracker)
         self.tracker_button.setShortcut('T')
@@ -437,7 +473,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.track_count=0 #edit sjs
 
         # CLEAR_TRACKER LIST
-        self.remove_tracker_button=QCheckBox('use Remove Tracks [R]')
+        self.remove_tracker_button=QCheckBox('Remove Tracks [R]')
+        self.remove_tracker_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.remove_tracker_button.setChecked(False)
         self.remove_tracker_button.stateChanged.connect(self.button_state_remove_tracker)
         self.remove_tracker_button.setShortcut('R')
@@ -445,6 +483,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # INCOMING LABEL REPLACE LIST
         self.replace_label_button=QCheckBox('Change Incoming Label Names from Yolo [N]')
+        self.replace_label_button.setStyleSheet(
+        "QCheckBox::indicator::unchecked { background-color : lightgreen; }")
         self.replace_label_button.setChecked(False)
         self.replace_label_button.stateChanged.connect(self.button_state_replace_label)
         self.replace_label_button.setShortcut('N')

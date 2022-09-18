@@ -22,10 +22,7 @@ It is written in Python and uses Qt for its graphical interface.
 Annotations are saved as XML files in PASCAL VOC format, the format used
 by `ImageNet <http://www.image-net.org/>`__.  Besides, it also supports YOLO and CreateML formats.
 
-.. image:: https://raw.githubusercontent.com/tzutalin/labelImg/master/demo/demo3.jpg
-     :alt: Demo Image
-
-.. image:: https://raw.githubusercontent.com/tzutalin/labelImg/master/demo/demo.jpg
+.. image:: https://github.com/stevensmiley1989/labelImg/blob/smiley/resources/icons/labelImg_Screenshot.png
      :alt: Demo Image
 
 `Watch a demo video <https://youtu.be/p0nR2YsCY_U>`__
@@ -33,28 +30,11 @@ by `ImageNet <http://www.image-net.org/>`__.  Besides, it also supports YOLO and
 Installation
 ------------------
 
-Get from PyPI but only python3.0 or above
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This is the simplest (one-command) install method on modern Linux distributions such as Ubuntu and Fedora.
 
-.. code:: shell
-
-    pip3 install labelImg
-    labelImg
-    labelImg [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
-
-
-Build from source
-~~~~~~~~~~~~~~~~~
-
-Linux/Ubuntu/Mac requires at least `Python
-2.6 <https://www.python.org/getit/>`__ and has been tested with `PyQt
-4.8 <https://www.riverbankcomputing.com/software/pyqt/intro>`__. However, `Python
-3 or above <https://www.python.org/getit/>`__ and  `PyQt5 <https://pypi.org/project/PyQt5/>`__ are strongly recommended.
 
 
 Ubuntu Linux
-^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Python 3 + Qt5
 
@@ -66,101 +46,6 @@ Python 3 + Qt5
     python3 labelImg.py
     python3 labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
 
-macOS
-^^^^^
-
-Python 3 + Qt5
-
-.. code:: shell
-
-    brew install qt  # Install qt-5.x.x by Homebrew
-    brew install libxml2
-
-    or using pip
-
-    pip3 install pyqt5 lxml # Install qt and lxml by pip
-
-    make qt5py3
-    python3 labelImg.py
-    python3 labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
-
-
-Python 3 Virtualenv (Recommended)
-
-Virtualenv can avoid a lot of the QT / Python version issues
-
-.. code:: shell
-
-    brew install python3
-    pip3 install pipenv
-    pipenv run pip install pyqt5==5.15.2 lxml
-    pipenv run make qt5py3
-    pipenv run python3 labelImg.py
-    [Optional] rm -rf build dist; pipenv run python setup.py py2app -A;mv "dist/labelImg.app" /Applications
-
-Note: The Last command gives you a nice .app file with a new SVG Icon in your /Applications folder. You can consider using the script: build-tools/build-for-macos.sh
-
-
-Windows
-^^^^^^^
-
-Install `Python <https://www.python.org/downloads/windows/>`__,
-`PyQt5 <https://www.riverbankcomputing.com/software/pyqt/download5>`__
-and `install lxml <http://lxml.de/installation.html>`__.
-
-Open cmd and go to the `labelImg <#labelimg>`__ directory
-
-.. code:: shell
-
-    pyrcc4 -o libs/resources.py resources.qrc
-    For pyqt5, pyrcc5 -o libs/resources.py resources.qrc
-
-    python labelImg.py
-    python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
-
-If you want to package it into a separate EXE file
-
-.. code:: shell
-
-    Install pyinstaller and execute:
-
-    pip install pyinstaller
-    pyinstaller --hidden-import=pyqt5 --hidden-import=lxml -F -n "labelImg" -c labelImg.py -p ./libs -p ./
-
-Windows + Anaconda
-^^^^^^^^^^^^^^^^^^
-
-Download and install `Anaconda <https://www.anaconda.com/download/#download>`__ (Python 3+)
-
-Open the Anaconda Prompt and go to the `labelImg <#labelimg>`__ directory
-
-.. code:: shell
-
-    conda install pyqt=5
-    conda install -c anaconda lxml
-    pyrcc5 -o libs/resources.py resources.qrc
-    python labelImg.py
-    python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
-
-Use Docker
-~~~~~~~~~~~~~~~~~
-.. code:: shell
-
-    docker run -it \
-    --user $(id -u) \
-    -e DISPLAY=unix$DISPLAY \
-    --workdir=$(pwd) \
-    --volume="/home/$USER:/home/$USER" \
-    --volume="/etc/group:/etc/group:ro" \
-    --volume="/etc/passwd:/etc/passwd:ro" \
-    --volume="/etc/shadow:/etc/shadow:ro" \
-    --volume="/etc/sudoers.d:/etc/sudoers.d:ro" \
-    -v /tmp/.X11-unix:/tmp/.X11-unix \
-    tzutalin/py2qt4
-
-    make qt4py2;./labelImg.py
-
-You can pull the image which has all of the installed and required dependencies. `Watch a demo video <https://youtu.be/nw1GexJzbCI>`__
 
 
 Usage
@@ -251,7 +136,26 @@ Hotkeys
 +--------------------+--------------------------------------------+
 | ↑→↓←               | Keyboard arrows to move selected rect box  |
 +--------------------+--------------------------------------------+
-
+| m                  | Move All shapes on canvas                  |
++--------------------+--------------------------------------------+
+| l                  | Lock Vertex of selection from moving       |
++--------------------+--------------------------------------------+
+| b                  | Edit Box                                   |
++--------------------+--------------------------------------------+
+| h                  | Keep difficult ON for all shapes           |
++--------------------+--------------------------------------------+
+| u                  | Keep difficult OFF for all shapes          |
++--------------------+--------------------------------------------+
+| m                  | Move All shapes on canvas                  |
++--------------------+--------------------------------------------+
+| y                  | Use Yolo with Full_Loop_Yolo               |
++--------------------+--------------------------------------------+
+| n                  | Change incoming labels from Yolo           |
++--------------------+--------------------------------------------+
+| t                  | Turn on optical tracker                    |
++--------------------+--------------------------------------------+
+| r                  | Remove tracks from tracker                 |
++--------------------+--------------------------------------------+
 **Verify Image:**
 
 When pressing space, the user can flag the image as verified, a green background will appear.
